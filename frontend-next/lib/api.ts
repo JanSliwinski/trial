@@ -1,6 +1,7 @@
 import type { BatterySpecs, OptimizeResult, BatteryPreset } from "./types";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || "";
+// Python serverless functions are on the same domain — no base URL needed
+const BASE = "";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
