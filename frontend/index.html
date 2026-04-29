@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelleniFlex — Live Market Dashboard</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0e1a; color: #e8e6df; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #0a0e1a; }
+    ::-webkit-scrollbar-thumb { background: #2a3450; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+const {
+  AreaChart, Area, LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  ReferenceLine, Cell,
+} = Recharts;
+
+// ─── design tokens ────────────────────────────────────────────────────────────
+const C = {
+  bg: "#0a0e1a", bgRaised: "#0f1422", surface: "#141a2a", surfaceHi: "#1a2238",
+  border: "#1f2940", borderBright: "#2a3450",
+  text: "#e8e6df", textMuted: "#7a8195", textDim: "#4a5168",
+  gold: "#e8b059", goldBright: "#f4c876", goldDim: "#8a6938",
+  blue: "#5b8def", coral: "#e87b5b", violet: "#a78bfa", green: "#7ed957",
+  teal: "#4ecdc4", orange: "#f7b731",
+};
+
+const API = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? `http://${window.location.hostname}:8000`
+  : "";
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+const fmt = (v, dec = 1) => v == null ? "—" : Number(v).toFixed(dec);
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+const fmtDate = (iso) => new Date(iso * 1000).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+const WMO_DESC = {
+  0:"Clear sky",1:"Mainly clear",2:"Partly cloudy",3:"Overcast",
+  45:"Foggy",48:"Icy fog",51:"Light drizzle",53:"Drizzle",55:"Heavy drizzle",
+  61:"Light rain",63:"Rain",65:"Heavy rain",71:"Light snow",73:"Snow",75:"Heavy snow",
+  80:"Rain showers",81:"Showers",82:"Violent showers",85:"Snow showers",
+  95:"Thunderstorm",96:"Thunderstorm+hail",99:"Heavy thunderstorm+hail",
+};
+
+// ─── shared UI primitives ─────────────────────────────────────────────────────
+const Card = ({ children, style = {}, onClick }) => (
+  <div onClick={onClick} style={{
+    background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12,
+    padding: "16px 20px", ...style,
+    cursor: onClick ? "pointer" : "default",
+    transition: "border-color .15s",
+  }}
+  onMouseEnter={onClick ? e => e.currentTarget.style.borderColor = C.borderBright : null}
+  onMouseLeave={onClick ? e => e.currentTarget.style.borderColor = C.border : null}
+  >
+    {children}
+  </div>
+);
+
+const Label = ({ children }) => (
+  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: C.textMuted, marginBottom: 4 }}>
+    {children}
+  </div>
+);
+
+const BigNum = ({ value, unit, color = C.gold }) => (
+  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+    <span style={{ fontSize: 28, fontWeight: 700, color, letterSpacing: "-0.02em" }}>{value}</span>
+    <span style={{ fontSize: 13, color: C.textMuted }}>{unit}</span>
+  </div>
+);
+
+const StatusDot = ({ ok }) => (
+  <span style={{
+    display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+    background: ok ? C.green : C.coral, marginRight: 6,
+    boxShadow: ok ? `0 0 6px ${C.green}` : `0 0 6px ${C.coral}`,
+  }} />
+);
+
+const MiniSparkline = ({ data, color }) => {
+  if (!data || data.length < 2) return <span style={{ color: C.textDim, fontSize: 12 }}>no data</span>;
+  const vals = data.filter(v => v != null);
+  return (
+    <ResponsiveContainer width="100%" height={40}>
+      <LineChart data={vals.map((v, i) => ({ i, v }))}>
+        <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+};
+
+// ─── section: status bar ─────────────────────────────────────────────────────
+const StatusBar = ({ status, updatedAt, onRefresh }) => (
+  <div style={{
+    background: C.bgRaised, borderBottom: `1px solid ${C.border}`,
+    padding: "6px 24px", display: "flex", alignItems: "center", gap: 20, fontSize: 12,
+  }}>
+    <span style={{ color: C.textMuted }}>
+      {updatedAt ? `Last refresh: ${fmtDate(updatedAt)}` : "Loading…"}
+    </span>
+    <div style={{ flex: 1, display: "flex", gap: 16 }}>
+      {status && Object.entries(status).map(([k, ok]) => (
+        <span key={k} style={{ color: C.textMuted }}>
+          <StatusDot ok={ok} />{k}
+        </span>
+      ))}
+    </div>
+    <button onClick={onRefresh} style={{
+      background: C.surfaceHi, border: `1px solid ${C.borderBright}`, borderRadius: 6,
+      color: C.text, cursor: "pointer", padding: "3px 10px", fontSize: 11,
+    }}>
+      ↻ Refresh
+    </button>
+  </div>
+);
+
+// ─── section: market ticker (top bar) ────────────────────────────────────────
+const TickerItem = ({ label, value, unit, color = C.gold }) => (
+  <div style={{
+    display: "flex", alignItems: "center", gap: 8,
+    borderRight: `1px solid ${C.border}`, paddingRight: 20, marginRight: 4,
+  }}>
+    <span style={{ color: C.textMuted, fontSize: 12 }}>{label}</span>
+    <span style={{ color, fontSize: 18, fontWeight: 700 }}>{value}</span>
+    <span style={{ color: C.textMuted, fontSize: 11 }}>{unit}</span>
+  </div>
+);
+
+// ─── section: DAM price chart ─────────────────────────────────────────────────
+const DamChart = ({ dam }) => {
+  if (!dam || !dam.prices_eur_mwh) return (
+    <Card style={{ gridColumn: "1/-1" }}>
+      <Label>Day-Ahead Market Prices</Label>
+      <div style={{ color: C.textMuted, padding: "40px 0", textAlign: "center" }}>
+        {dam?.error || "Fetching…"}
+      </div>
+    </Card>
+  );
+
+  const prices = dam.prices_eur_mwh;
+  const res = dam.resolution_min || 60;
+  const data = prices.map((p, i) => {
+    const h = Math.floor((i * res) / 60);
+    const m = (i * res) % 60;
+    return { slot: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`, price: p };
+  });
+
+  const minP = Math.min(...prices), maxP = Math.max(...prices);
+  const avgP = prices.reduce((a, b) => a + b, 0) / prices.length;
+
+  return (
+    <Card style={{ gridColumn: "1/-1" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div>
+          <Label>Day-Ahead Market — {dam.date} <span style={{ color: C.textDim, fontSize: 11 }}>({dam.source})</span></Label>
+          <div style={{ display: "flex", gap: 20, fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+            <span>Min <b style={{ color: minP < 0 ? C.violet : C.coral }}>{fmt(minP)}</b></span>
+            <span>Avg <b style={{ color: C.gold }}>{fmt(avgP)}</b></span>
+            <span>Max <b style={{ color: C.green }}>{fmt(maxP)}</b></span>
+            <span style={{ color: C.textDim }}>€/MWh</span>
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: C.textMuted }}>
+          {res}-min resolution · {prices.length} slots
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={220}>
+        <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="damGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={C.gold} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={C.gold} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+          <XAxis dataKey="slot" tick={{ fill: C.textDim, fontSize: 10 }}
+            interval={Math.floor(data.length / 6)} tickLine={false} />
+          <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} tickLine={false}
+            tickFormatter={v => `${v}`} width={42} />
+          <Tooltip
+            contentStyle={{ background: C.surfaceHi, border: `1px solid ${C.borderBright}`, borderRadius: 8 }}
+            labelStyle={{ color: C.textMuted }} itemStyle={{ color: C.gold }}
+            formatter={v => [`${fmt(v)} €/MWh`, "Price"]}
+          />
+          <ReferenceLine y={0} stroke={C.violet} strokeDasharray="4 2" strokeOpacity={0.6} />
+          <Area type="monotone" dataKey="price" stroke={C.gold} strokeWidth={2}
+            fill="url(#damGrad)" isAnimationActive={false}
+            dot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </Card>
+  );
+};
+
+// ─── section: ADMIE generation mix ───────────────────────────────────────────
+const AdmieChart = ({ admie }) => {
+  if (!admie || !admie.load_mw) return (
+    <Card>
+      <Label>ADMIE / IPTO — Greek Grid</Label>
+      <div style={{ color: C.textMuted, padding: "40px 0", textAlign: "center" }}>
+        {admie?.error || "Fetching…"}
+      </div>
+    </Card>
+  );
+
+  const hours = admie.hours;
+  const data = hours.map((h, i) => ({
+    h: `${String(h - 1).padStart(2, "0")}:00`,
+    load: admie.load_mw[i],
+    wind: admie.wind_mw[i],
+    solar: admie.solar_mw[i],
+  }));
+
+  const peakLoad = Math.max(...admie.load_mw);
+  const totalWind = admie.wind_mw.reduce((a, b) => a + b, 0) / admie.wind_mw.length;
+  const totalSolar = admie.solar_mw.reduce((a, b) => a + b, 0) / admie.solar_mw.length;
+
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div>
+          <Label>ADMIE / IPTO — {admie.date} <span style={{ color: C.textDim, fontSize: 11 }}>({admie.source})</span></Label>
+          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4, display: "flex", gap: 16 }}>
+            <span>Peak load <b style={{ color: C.coral }}>{fmt(peakLoad, 0)} MW</b></span>
+            <span>Avg wind <b style={{ color: C.teal }}>{fmt(totalWind, 0)} MW</b></span>
+            <span>Avg solar <b style={{ color: C.orange }}>{fmt(totalSolar, 0)} MW</b></span>
+          </div>
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={220}>
+        <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="loadGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={C.coral} stopOpacity={0.25} />
+              <stop offset="95%" stopColor={C.coral} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+          <XAxis dataKey="h" tick={{ fill: C.textDim, fontSize: 10 }} tickLine={false} interval={3} />
+          <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} tickLine={false} width={48}
+            tickFormatter={v => `${(v / 1000).toFixed(1)}GW`} />
+          <Tooltip
+            contentStyle={{ background: C.surfaceHi, border: `1px solid ${C.borderBright}`, borderRadius: 8 }}
+            labelStyle={{ color: C.textMuted }}
+            formatter={(v, n) => [`${fmt(v, 0)} MW`, n]}
+          />
+          <Legend wrapperStyle={{ fontSize: 11, color: C.textMuted }} />
+          <Area type="monotone" dataKey="load" stroke={C.coral} strokeWidth={2}
+            fill="url(#loadGrad)" name="Load" isAnimationActive={false} dot={false} />
+          <Area type="monotone" dataKey="wind" stroke={C.teal} strokeWidth={1.5}
+            fill="none" name="Wind" isAnimationActive={false} dot={false} />
+          <Area type="monotone" dataKey="solar" stroke={C.orange} strokeWidth={1.5}
+            fill="none" name="Solar" isAnimationActive={false} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </Card>
+  );
+};
+
+// ─── section: weather ─────────────────────────────────────────────────────────
+const MeteoPanel = ({ meteo }) => {
+  if (!meteo) return (
+    <Card>
+      <Label>Athens Weather</Label>
+      <div style={{ color: C.textMuted, padding: "40px 0", textAlign: "center" }}>Fetching…</div>
+    </Card>
+  );
+  if (meteo.error) return (
+    <Card>
+      <Label>Athens Weather</Label>
+      <div style={{ color: C.coral, fontSize: 12 }}>{meteo.error}</div>
+    </Card>
+  );
+
+  const cur = meteo.current || {};
+  const h = meteo.hourly || {};
+  const now = new Date();
+  const slots = (h.time || []).slice(0, 24).map((t, i) => ({
+    t: fmtTime(t),
+    temp: h.temperature_2m?.[i],
+    wind: h.windspeed_10m?.[i],
+    rad: h.shortwave_radiation?.[i],
+  }));
+
+  return (
+    <Card>
+      <div style={{ marginBottom: 12 }}>
+        <Label>Athens Weather Forecast</Label>
+        <div style={{ display: "flex", gap: 24, marginTop: 8 }}>
+          <div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: C.orange }}>{fmt(cur.temperature_2m, 0)}°C</div>
+            <div style={{ fontSize: 12, color: C.textMuted }}>{WMO_DESC[cur.weathercode] || "—"}</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 4, fontSize: 13 }}>
+            <span style={{ color: C.textMuted }}>Wind <b style={{ color: C.teal }}>{fmt(cur.windspeed_10m, 0)} km/h</b></span>
+            <span style={{ color: C.textMuted }}>Humidity <b style={{ color: C.blue }}>{fmt(cur.relative_humidity_2m, 0)}%</b></span>
+          </div>
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={160}>
+        <AreaChart data={slots} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="tempGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={C.orange} stopOpacity={0.35} />
+              <stop offset="95%" stopColor={C.orange} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+          <XAxis dataKey="t" tick={{ fill: C.textDim, fontSize: 9 }} tickLine={false} interval={3} />
+          <YAxis tick={{ fill: C.textMuted, fontSize: 9 }} tickLine={false} width={30}
+            tickFormatter={v => `${v}°`} />
+          <Tooltip
+            contentStyle={{ background: C.surfaceHi, border: `1px solid ${C.borderBright}`, borderRadius: 8 }}
+            labelStyle={{ color: C.textMuted }}
+            formatter={(v, n) => [n === "temp" ? `${fmt(v, 1)}°C` : `${fmt(v, 0)} km/h`, n]}
+          />
+          <Area type="monotone" dataKey="temp" stroke={C.orange} strokeWidth={2}
+            fill="url(#tempGrad)" name="temp" isAnimationActive={false} dot={false} />
+          <Line type="monotone" dataKey="wind" stroke={C.teal} strokeWidth={1.5}
+            name="wind" isAnimationActive={false} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </Card>
+  );
+};
+
+// ─── section: TTF + EUA market cards ──────────────────────────────────────────
+const MarketCard = ({ label, data, color, unit }) => {
+  const price = data?.current_price;
+  const prices = data?.prices || [];
+  const err = data?.error;
+
+  return (
+    <Card>
+      <Label>{label} <span style={{ color: C.textDim, fontSize: 10 }}>({data?.source || "—"})</span></Label>
+      {err
+        ? <div style={{ color: C.coral, fontSize: 12, marginTop: 8 }}>{err}</div>
+        : <>
+            <BigNum value={price != null ? fmt(price, 2) : "—"} unit={unit} color={color} />
+            <div style={{ marginTop: 8 }}>
+              <MiniSparkline data={prices} color={color} />
+            </div>
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>
+              30-day trend · {prices.length} points
+            </div>
+          </>
+      }
+    </Card>
+  );
+};
+
+// ─── section: DAM summary card ────────────────────────────────────────────────
+const DamCard = ({ dam }) => {
+  const prices = dam?.prices_eur_mwh;
+  const err = dam?.error;
+  const nowSlot = prices ? Math.min(Math.floor(new Date().getHours() * (prices.length / 24)), prices.length - 1) : null;
+  const current = prices && nowSlot != null ? prices[nowSlot] : null;
+
+  return (
+    <Card>
+      <Label>DAM Price — Now <span style={{ color: C.textDim, fontSize: 10 }}>({dam?.source || "—"})</span></Label>
+      {err
+        ? <div style={{ color: C.coral, fontSize: 12, marginTop: 8 }}>{err}</div>
+        : <>
+            <BigNum value={current != null ? fmt(current, 1) : "—"} unit="€/MWh" color={C.gold} />
+            <div style={{ marginTop: 8 }}>
+              <MiniSparkline data={prices} color={C.gold} />
+            </div>
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>{dam?.date} · {prices?.length || "?"} slots</div>
+          </>
+      }
+    </Card>
+  );
+};
+
+// ─── main app ─────────────────────────────────────────────────────────────────
+function App() {
+  const [all, setAll] = useState(null);
+  const [statusInfo, setStatusInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [allRes, statusRes] = await Promise.all([
+        fetch(`${API}/api/all`),
+        fetch(`${API}/api/status`),
+      ]);
+      if (!allRes.ok) throw new Error(`HTTP ${allRes.status}`);
+      const [allData, statusData] = await Promise.all([allRes.json(), statusRes.json()]);
+      setAll(allData);
+      setStatusInfo(statusData);
+      setError(null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  const meteo = all?.meteo;
+  const dam = all?.dam;
+  const ttf = all?.ttf;
+  const eua = all?.eua;
+  const admie = all?.admie;
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg }}>
+      {/* Header */}
+      <div style={{
+        background: C.bgRaised, borderBottom: `1px solid ${C.border}`,
+        padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div>
+          <span style={{ fontSize: 22, fontWeight: 800, color: C.goldBright, letterSpacing: "-0.02em" }}>
+            HelleniFlex
+          </span>
+          <span style={{ marginLeft: 10, fontSize: 14, color: C.textMuted }}>Live Market Dashboard</span>
+        </div>
+        <div style={{ fontSize: 12, color: C.textDim }}>🇬🇷 Greek Energy Markets</div>
+      </div>
+
+      {/* Status bar */}
+      <StatusBar
+        status={statusInfo?.sources}
+        updatedAt={all?._updated_at}
+        onRefresh={load}
+      />
+
+      {loading && (
+        <div style={{ padding: 60, textAlign: "center", color: C.textMuted }}>
+          Loading market data…
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          margin: 24, padding: 16, background: "#2a1522", border: `1px solid ${C.coral}`,
+          borderRadius: 10, color: C.coral, fontSize: 14,
+        }}>
+          <b>Cannot reach backend</b> — make sure the FastAPI server is running on port 8000.
+          <br /><code style={{ fontSize: 11 }}>cd backend &amp;&amp; uvicorn main:app --reload</code>
+          <br /><span style={{ fontSize: 12, color: C.textMuted }}>{error}</span>
+        </div>
+      )}
+
+      {!loading && !error && (
+        <div style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
+
+          {/* Summary cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 20 }}>
+            <DamCard dam={dam} />
+            <MarketCard label="TTF Natural Gas" data={ttf} color={C.teal} unit="€/MWh" />
+            <MarketCard label="EUA Carbon Price" data={eua} color={C.violet} unit="€/tCO₂" />
+            <Card>
+              <Label>Athens — Current</Label>
+              {meteo?.error
+                ? <div style={{ color: C.coral, fontSize: 12, marginTop: 8 }}>{meteo.error}</div>
+                : <>
+                    <BigNum
+                      value={meteo?.current?.temperature_2m != null ? fmt(meteo.current.temperature_2m, 0) : "—"}
+                      unit="°C" color={C.orange}
+                    />
+                    <div style={{ fontSize: 13, color: C.textMuted, marginTop: 4 }}>
+                      {WMO_DESC[meteo?.current?.weathercode] || "—"}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
+                      Wind {fmt(meteo?.current?.windspeed_10m, 0)} km/h
+                    </div>
+                  </>
+              }
+            </Card>
+          </div>
+
+          {/* DAM price chart — full width */}
+          <div style={{ marginBottom: 20 }}>
+            <DamChart dam={dam} />
+          </div>
+
+          {/* ADMIE + Weather — two columns */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+            <AdmieChart admie={admie} />
+            <MeteoPanel meteo={meteo} />
+          </div>
+
+          {/* RES summary strip */}
+          {admie && !admie.error && admie.wind_mw && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
+              {[
+                { label: "Peak Wind (today)", value: fmt(Math.max(...admie.wind_mw), 0), unit: "MW", color: C.teal },
+                { label: "Peak Solar (today)", value: fmt(Math.max(...admie.solar_mw), 0), unit: "MW", color: C.orange },
+                { label: "Peak Load (today)", value: fmt(Math.max(...admie.load_mw), 0), unit: "MW", color: C.coral },
+              ].map(({ label, value, unit, color }) => (
+                <Card key={label}>
+                  <Label>{label}</Label>
+                  <BigNum value={value} unit={unit} color={color} />
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Footer */}
+          <div style={{ textAlign: "center", padding: "20px 0", fontSize: 11, color: C.textDim }}>
+            HelleniFlex · Data refreshes every 15 min · Sources: Open-Meteo, HEnEx, ADMIE/IPTO, Yahoo Finance, Ember Climate
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

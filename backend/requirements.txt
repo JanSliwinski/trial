@@ -1,0 +1,9 @@
+fastapi>=0.111
+uvicorn[standard]>=0.29
+requests>=2.31
+pandas>=2.0
+openpyxl>=3.1
+yfinance>=0.2.40
+
+# Optional — upgrade DAM/ADMIE reliability:
+# entsoe-py>=0.6.6
