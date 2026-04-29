@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #070B14;
+  --surface: #0D1526;
+  --surface2: #111D33;
+  --border: #1E2D4A;
+  --primary: #3B82F6;
+  --green: #22C55E;
+  --amber: #F59E0B;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: #E2E8F0;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #2D4266; }
+
+/* Input / select resets */
+input[type="number"],
+input[type="text"],
+input[type="date"],
+select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: #E2E8F0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  width: 100%;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input[type="number"]:focus,
+input[type="text"]:focus,
+input[type="date"]:focus,
+select:focus {
+  border-color: var(--primary);
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(59,130,246,0.5);
+}
+
+/* Card glass */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.card-sm {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+
+/* Glow effect on primary elements */
+.glow-blue {
+  box-shadow: 0 0 20px rgba(59,130,246,0.15), 0 0 40px rgba(59,130,246,0.05);
+}
+
+/* Recharts dark overrides */
+.recharts-cartesian-axis-tick-value {
+  fill: #64748B !important;
+  font-size: 11px;
+}
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+.recharts-default-tooltip {
+  background: #0D1526 !important;
+  border: 1px solid #1E2D4A !important;
+  border-radius: 8px !important;
+}

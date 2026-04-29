@@ -1,15 +1,15 @@
-"""HelleniFlex Live Market Data Backend
+"""HelleniFlex Live Market Data + Optimization Backend
 
-FastAPI server with async background refresh for:
-  - meteo   : Open-Meteo weather forecast (Athens)
-  - dam     : HEnEx / ENTSO-E Day-Ahead Market prices
-  - ttf     : TTF natural gas futures (Yahoo Finance)
-  - eua     : EUA carbon price (Ember Climate / Yahoo Finance)
-  - admie   : ADMIE/IPTO Greek grid load + RES forecast
+FastAPI server with:
+  - Async background market data refresh (meteo, dam, ttf, eua, admie)
+  - POST /api/optimize  — full BESS day-ahead bidding pipeline
+  - GET  /api/battery-presets — available battery presets
+  - GET  /api/status, /api/all, /api/{source}
 
 Env vars:
-  ENTSOE_TOKEN   — ENTSO-E API token (optional, improves DAM + ADMIE fallback)
+  ENTSOE_TOKEN   — ENTSO-E API token (optional)
   REFRESH_MINS   — data refresh interval in minutes (default 15)
+  FRONTEND_URL   — allowed CORS origin (default *)
 
 Run:
   cd backend && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
@@ -17,15 +17,25 @@ Run:
 
 import asyncio
 import logging
+import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 import os
 
+import numpy as np
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+# Make pipeline.py importable (it lives one level up from backend/)
+_BACKEND_DIR = Path(__file__).parent
+_ROOT = _BACKEND_DIR.parent
+sys.path.insert(0, str(_ROOT))
+import pipeline
 
 from fetchers.meteo import fetch_meteo
 from fetchers.dam import fetch_dam
@@ -36,9 +46,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 REFRESH_INTERVAL = int(os.getenv("REFRESH_MINS", "15")) * 60
-_FRONTEND = Path(__file__).parent.parent / "frontend"
+_FRONTEND = _ROOT / "frontend"
 
-# ── in-memory store ──────────────────────────────────────────────────────────
+# ── in-memory market data store ───────────────────────────────────────────────
 _store: dict = {}
 
 
@@ -58,7 +68,6 @@ def _refresh_all() -> None:
             log.warning("  ✗ %s: %s", name, exc)
             prev = _store.get(name, {})
             _store[name] = {**prev, "ok": False, "error": str(exc)}
-
     _store["_updated_at"] = time.time()
 
 
@@ -71,7 +80,6 @@ async def _scheduler() -> None:
         await asyncio.sleep(REFRESH_INTERVAL)
 
 
-# ── app lifecycle ─────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("Initial data fetch…")
@@ -82,17 +90,106 @@ async def lifespan(app: FastAPI):
     task.cancel()
 
 
-app = FastAPI(title="HelleniFlex Live Data API", version="1.0", lifespan=lifespan)
+app = FastAPI(title="HelleniFlex API", version="2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
 
-# ── API routes ────────────────────────────────────────────────────────────────
+# ── Pydantic models ───────────────────────────────────────────────────────────
+
+class BatterySpecs(BaseModel):
+    capacity_mwh: float = Field(10.0, gt=0, le=500)
+    power_mw: float = Field(5.0, gt=0, le=250)
+    rte_pct: float = Field(88.0, gt=50, lt=100)
+    soc_min_pct: float = Field(10.0, ge=0, lt=50)
+    soc_max_pct: float = Field(90.0, gt=50, le=100)
+    deg_cost: float = Field(5.0, ge=0, le=50)
+    max_cycles: float = Field(2.0, gt=0, le=10)
+    initial_soc_pct: float = Field(50.0, ge=0, le=100)
+
+
+class OptimizeRequest(BaseModel):
+    date: str
+    battery_specs: BatterySpecs
+
+
+# ── Numpy serializer ──────────────────────────────────────────────────────────
+
+def _serialize(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {k: _serialize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_serialize(i) for i in obj]
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    return obj
+
+
+# ── Optimization endpoint ─────────────────────────────────────────────────────
+
+@app.post("/api/optimize")
+async def run_optimize(req: OptimizeRequest):
+    specs = req.battery_specs.model_dump()
+    loop = asyncio.get_running_loop()
+    try:
+        result = await loop.run_in_executor(None, pipeline.optimize, req.date, specs)
+        return _serialize(result)
+    except Exception as exc:
+        log.error("Optimize error: %s", exc)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+# ── Battery presets endpoint ──────────────────────────────────────────────────
+
+@app.get("/api/battery-presets")
+def battery_presets():
+    return [
+        {
+            "name": "Greek 1-hour BESS",
+            "specs": {
+                "capacity_mwh": 5.0, "power_mw": 5.0, "rte_pct": 88.0,
+                "soc_min_pct": 10.0, "soc_max_pct": 90.0,
+                "deg_cost": 5.0, "max_cycles": 2.0, "initial_soc_pct": 50.0,
+            },
+        },
+        {
+            "name": "Greek 2-hour BESS",
+            "specs": {
+                "capacity_mwh": 10.0, "power_mw": 5.0, "rte_pct": 88.0,
+                "soc_min_pct": 10.0, "soc_max_pct": 90.0,
+                "deg_cost": 5.0, "max_cycles": 2.0, "initial_soc_pct": 50.0,
+            },
+        },
+        {
+            "name": "Greek 4-hour BESS",
+            "specs": {
+                "capacity_mwh": 20.0, "power_mw": 5.0, "rte_pct": 88.0,
+                "soc_min_pct": 10.0, "soc_max_pct": 90.0,
+                "deg_cost": 5.0, "max_cycles": 2.0, "initial_soc_pct": 50.0,
+            },
+        },
+        {
+            "name": "Utility 50 MW / 2h",
+            "specs": {
+                "capacity_mwh": 100.0, "power_mw": 50.0, "rte_pct": 90.0,
+                "soc_min_pct": 5.0, "soc_max_pct": 95.0,
+                "deg_cost": 3.0, "max_cycles": 2.0, "initial_soc_pct": 50.0,
+            },
+        },
+    ]
+
+
+# ── Market data endpoints ─────────────────────────────────────────────────────
+
 @app.get("/api/status")
 def status():
     updated = _store.get("_updated_at")
@@ -125,10 +222,14 @@ def get_source(source: str):
     return JSONResponse({"error": entry.get("error", "fetch failed")}, status_code=503)
 
 
-# ── serve frontend ────────────────────────────────────────────────────────────
+# ── Serve static frontend ─────────────────────────────────────────────────────
+
 @app.get("/")
 def index():
-    return FileResponse(_FRONTEND / "index.html")
+    index_html = _FRONTEND / "index.html"
+    if index_html.exists():
+        return FileResponse(index_html)
+    return {"message": "HelleniFlex API v2.0 — see /docs"}
 
 if _FRONTEND.exists():
     app.mount("/static", StaticFiles(directory=str(_FRONTEND)), name="static")
