@@ -80,8 +80,8 @@ export default function ScheduleChart({ charge, discharge }: Props) {
           />
           <Tooltip content={<ScheduleTooltip />} />
           <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
-          <Bar dataKey="charge" fill="url(#chargeGrad)" name="Charge" maxBarSize={6} radius={[2, 2, 0, 0]} />
-          <Bar dataKey="discharge" fill="url(#dischargeGrad)" name="Discharge" maxBarSize={6} radius={[2, 2, 0, 0]} />
+          <Bar dataKey="charge" fill="url(#chargeGrad)" name="Charge" maxBarSize={6} radius={2} />
+          <Bar dataKey="discharge" fill="url(#dischargeGrad)" name="Discharge" maxBarSize={6} radius={2} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

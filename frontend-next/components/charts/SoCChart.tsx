@@ -96,7 +96,7 @@ export default function SoCChart({ soc, socMinMwh, socMaxMwh }: Props) {
               stroke="rgba(56,189,248,0.35)"
               strokeDasharray="4 3"
               strokeWidth={1}
-              label={{ value: "min", position: "insideRight", fontSize: 9, fill: "#3d5a78" }}
+              label={{ value: "min", position: "insideRight" }}
             />
           )}
           {socMaxMwh !== undefined && (
@@ -105,7 +105,7 @@ export default function SoCChart({ soc, socMinMwh, socMaxMwh }: Props) {
               stroke="rgba(56,189,248,0.35)"
               strokeDasharray="4 3"
               strokeWidth={1}
-              label={{ value: "max", position: "insideRight", fontSize: 9, fill: "#3d5a78" }}
+              label={{ value: "max", position: "insideRight" }}
             />
           )}
 

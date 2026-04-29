@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Download, SlidersHorizontal, TrendingUp, Activity, FileText, CheckCircle2 } from "lucide-react";
+import { Download, SlidersHorizontal, CheckCircle2 } from "lucide-react";
 
 import Navbar, { type NavTab } from "@/components/Navbar";
 import Hero from "@/components/Hero";

@@ -102,7 +102,7 @@ export default function RevenueChart({ revenue, forecastPrices }: Props) {
           <ReferenceLine yAxisId="interval" y={0} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
 
           {/* Per-interval bars */}
-          <Bar yAxisId="interval" dataKey="interval" name="Interval P&L" maxBarSize={7} radius={[2, 2, 0, 0]}>
+          <Bar yAxisId="interval" dataKey="interval" name="Interval P&L" maxBarSize={7} radius={2}>
             {data.map((d, i) => (
               <Cell
                 key={i}
