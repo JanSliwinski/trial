@@ -1,11 +1,9 @@
 {
   "functions": {
     "api/optimize.py": {
-      "runtime": "python3.12",
       "maxDuration": 60
     },
     "api/battery-presets.py": {
-      "runtime": "python3.12",
       "maxDuration": 10
     }
   },
