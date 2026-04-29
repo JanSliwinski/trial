@@ -1,110 +1,188 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ─────────────────────────────────────────────────── */
 :root {
-  --bg: #070B14;
-  --surface: #0D1526;
-  --surface2: #111D33;
-  --border: #1E2D4A;
-  --primary: #3B82F6;
-  --green: #22C55E;
-  --amber: #F59E0B;
+  --bg-deep:      #020810;
+  --bg:           #050d1b;
+  --surface:      #091527;
+  --surface-2:    #0d1e35;
+  --surface-3:    #122543;
+  --border:       #182f4a;
+  --border-2:     #1e3d60;
+  --primary:      #38bdf8;
+  --primary-dim:  rgba(56,189,248,0.10);
+  --primary-glow: rgba(56,189,248,0.22);
+  --emerald:      #34d399;
+  --emerald-dim:  rgba(52,211,153,0.10);
+  --amber:        #fbbf24;
+  --amber-dim:    rgba(251,191,36,0.10);
+  --orange:       #fb923c;
+  --orange-dim:   rgba(251,146,60,0.10);
+  --red:          #f87171;
+  --text:         #eef4ff;
+  --text-2:       #8ba3bf;
+  --text-3:       #3d5a78;
+  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
 }
 
-* {
-  box-sizing: border-box;
-}
+/* ── Reset ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html,
-body {
-  background: var(--bg);
-  color: #E2E8F0;
-  font-family: 'Inter', system-ui, sans-serif;
+html, body {
+  height: 100%;
+  background: var(--bg-deep);
+  color: var(--text);
+  font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02','cv03','cv04','cv11','ss01';
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--surface); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #2D4266; }
+/* ── Background patterns ────────────────────────────────────────────── */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(56,189,248,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56,189,248,0.03) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
 
-/* Input / select resets */
+.bg-dots {
+  background-image: radial-gradient(circle, rgba(56,189,248,0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.hero-glow {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(56,189,248,0.13) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 80% 40%, rgba(52,211,153,0.05) 0%, transparent 50%);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #2a5080; }
+
+/* ── Form inputs ────────────────────────────────────────────────────── */
 input[type="number"],
 input[type="text"],
 input[type="date"],
 select {
-  background: var(--surface2);
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  color: #E2E8F0;
-  border-radius: 6px;
-  padding: 6px 10px;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 11px;
   width: 100%;
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
-  transition: border-color 0.15s;
-}
-
-input[type="number"]:focus,
-input[type="text"]:focus,
-input[type="date"]:focus,
-select:focus {
-  border-color: var(--primary);
-}
-
-input[type="range"] {
-  -webkit-appearance: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
   appearance: none;
-  height: 4px;
+  -webkit-appearance: none;
+}
+input:focus, select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(56,189,248,0.12);
+}
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); }
+
+/* Range slider */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  height: 3px;
   background: var(--border);
   border-radius: 2px;
-  outline: none;
-  cursor: pointer;
+  outline: none; cursor: pointer; width: 100%;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 15px; height: 15px;
   border-radius: 50%;
   background: var(--primary);
   cursor: pointer;
-  box-shadow: 0 0 6px rgba(59,130,246,0.5);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 2px rgba(56,189,248,0.25);
+  transition: box-shadow 0.15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 4px rgba(56,189,248,0.35);
 }
 
-/* Card glass */
+/* ── Card primitives ────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 16px;
+  padding: 22px;
 }
-
 .card-sm {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 18px;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.card-glass {
+  background: rgba(9,21,39,0.75);
+  border: 1px solid rgba(24,47,74,0.9);
+  border-radius: 16px;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
 }
 
-/* Glow effect on primary elements */
-.glow-blue {
-  box-shadow: 0 0 20px rgba(59,130,246,0.15), 0 0 40px rgba(59,130,246,0.05);
+/* ── Glow variants ──────────────────────────────────────────────────── */
+.glow-blue   { box-shadow: 0 0 0 1px rgba(56,189,248,0.2),  0 4px 32px rgba(56,189,248,0.07); }
+.glow-green  { box-shadow: 0 0 0 1px rgba(52,211,153,0.2),  0 4px 32px rgba(52,211,153,0.07); }
+.glow-amber  { box-shadow: 0 0 0 1px rgba(251,191,36,0.2),  0 4px 32px rgba(251,191,36,0.07); }
+.glow-orange { box-shadow: 0 0 0 1px rgba(251,146,60,0.2),  0 4px 32px rgba(251,146,60,0.07); }
+
+/* ── Gradient text ──────────────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #34d399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* Recharts dark overrides */
+/* ── Recharts dark overrides ────────────────────────────────────────── */
 .recharts-cartesian-axis-tick-value {
-  fill: #64748B !important;
-  font-size: 11px;
+  fill: var(--text-3) !important;
+  font-size: 11px !important;
+  font-family: var(--font-mono) !important;
 }
-.recharts-tooltip-wrapper {
-  outline: none !important;
+.recharts-legend-item-text {
+  color: var(--text-2) !important;
+  font-size: 11px !important;
 }
-.recharts-default-tooltip {
-  background: #0D1526 !important;
-  border: 1px solid #1E2D4A !important;
-  border-radius: 8px !important;
+.recharts-tooltip-wrapper { outline: none !important; }
+.recharts-cartesian-grid line { stroke: rgba(24,47,74,0.6) !important; }
+
+/* ── Animations ─────────────────────────────────────────────────────── */
+@keyframes fadeIn    { from { opacity: 0 }                              to { opacity: 1 } }
+@keyframes slideUp   { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes slideIn   { from { opacity: 0; transform: translateX(-14px)} to { opacity: 1; transform: translateX(0) } }
+@keyframes pulse     { 0%,100% { opacity:1 }                           50% { opacity:0.4 } }
+@keyframes shimmer   {
+  0%   { background-position: -200% center }
+  100% { background-position:  200% center }
 }
+@keyframes ticker {
+  0%   { transform: translateX(0) }
+  100% { transform: translateX(-50%) }
+}
+
+.animate-ticker { animation: ticker 30s linear infinite; }
+.animate-pulse  { animation: pulse 1.8s ease-in-out infinite; }
+
+/* Shimmer skeleton */
+.shimmer {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+}
+
+/* ── Utility ────────────────────────────────────────────────────────── */
+.font-mono { font-family: var(--font-mono); }
+.tabular-nums { font-variant-numeric: tabular-nums; }

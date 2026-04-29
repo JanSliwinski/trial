@@ -1,65 +1,125 @@
 "use client";
 
-import { TrendingUp, Repeat2, Target } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { TrendingUp, Repeat2, Target, ArrowUpRight } from "lucide-react";
 import type { OptimizeResult } from "@/lib/types";
 
-interface Props {
-  result: OptimizeResult;
+function useCounter(target: number, duration = 1100) {
+  const [val, setVal] = useState(0);
+  const rafRef = useRef<number>();
+  useEffect(() => {
+    if (!isFinite(target)) return;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setVal(target * eased);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+      else setVal(target);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [target, duration]);
+  return val;
 }
 
-export default function KPICards({ result }: Props) {
-  const { expected_revenue, cycles, capture_rate } = result;
+const item = {
+  hidden: { opacity: 0, y: 18 },
+  show:   { opacity: 1, y: 0,  transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
+};
 
+interface KPICardProps {
+  label: string;
+  rawValue: number;
+  format: (v: number) => string;
+  sub: string;
+  Icon: React.ElementType;
+  color: string;
+  dimColor: string;
+  glowClass: string;
+  trend?: string;
+}
+
+function KPICard({ label, rawValue, format, sub, Icon, color, dimColor, glowClass, trend }: KPICardProps) {
+  const animated = useCounter(rawValue);
   return (
-    <div className="grid grid-cols-3 gap-4 animate-fade-in">
-      <KPICard
-        icon={<TrendingUp className="w-4 h-4 text-green" />}
-        label="Expected Revenue"
-        value={`€${expected_revenue.toLocaleString("en", { maximumFractionDigits: 0 })}`}
-        sub="Net revenue on median forecast"
-        color="text-green"
-        glow="shadow-green-500/10"
-      />
-      <KPICard
-        icon={<Repeat2 className="w-4 h-4 text-primary" />}
-        label="Cycles Today"
-        value={cycles.toFixed(2)}
-        sub="Equivalent full charge cycles"
-        color="text-primary"
-        glow="shadow-blue-500/10"
-      />
-      <KPICard
-        icon={<Target className="w-4 h-4 text-amber" />}
-        label="Capture Rate"
-        value={capture_rate !== null ? `${capture_rate.toFixed(1)}%` : "N/A"}
-        sub="vs. perfect foresight"
-        color="text-amber"
-        glow="shadow-amber-500/10"
-      />
-    </div>
+    <motion.div variants={item}
+      className={`card ${glowClass} relative overflow-hidden group
+                  hover:border-opacity-70 transition-all duration-300`}>
+      {/* Background glow blob */}
+      <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-30"
+        style={{ background: color }} />
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: dimColor }}>
+            <Icon className="w-4 h-4" style={{ color }} strokeWidth={2} />
+          </div>
+          {trend && (
+            <div className="flex items-center gap-1 text-[11px] font-medium"
+              style={{ color }}>
+              <ArrowUpRight className="w-3 h-3" />
+              {trend}
+            </div>
+          )}
+        </div>
+
+        <div className="text-[28px] font-mono font-bold tabular-nums leading-none mb-1.5"
+          style={{ color }}>
+          {format(animated)}
+        </div>
+
+        <div className="text-[12px] font-semibold text-text mb-0.5">{label}</div>
+        <div className="text-[11px] text-text-3">{sub}</div>
+      </div>
+    </motion.div>
   );
 }
 
-function KPICard({
-  icon, label, value, sub, color, glow,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub: string;
-  color: string;
-  glow: string;
-}) {
+export default function KPICards({ result }: { result: OptimizeResult }) {
+  const { expected_revenue, cycles, capture_rate } = result;
+
   return (
-    <div className={`card shadow-lg ${glow}`}>
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-7 h-7 rounded-md bg-surface2 flex items-center justify-center">
-          {icon}
-        </div>
-        <span className="text-xs text-muted font-medium">{label}</span>
-      </div>
-      <div className={`text-2xl font-semibold font-mono ${color}`}>{value}</div>
-      <div className="text-xs text-muted mt-1">{sub}</div>
-    </div>
+    <motion.div
+      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.1 } } }}
+      initial="hidden"
+      animate="show"
+      className="grid grid-cols-3 gap-4"
+    >
+      <KPICard
+        label="Expected Revenue"
+        rawValue={expected_revenue}
+        format={(v) => `€${Math.round(v).toLocaleString("en")}`}
+        sub="Net revenue on median forecast"
+        Icon={TrendingUp}
+        color="#34d399"
+        dimColor="rgba(52,211,153,0.12)"
+        glowClass="glow-green"
+        trend="Day-ahead"
+      />
+      <KPICard
+        label="Cycles Today"
+        rawValue={cycles}
+        format={(v) => v.toFixed(2)}
+        sub="Equivalent full charge cycles"
+        Icon={Repeat2}
+        color="#38bdf8"
+        dimColor="rgba(56,189,248,0.12)"
+        glowClass="glow-blue"
+      />
+      <KPICard
+        label="Capture Rate"
+        rawValue={capture_rate ?? 0}
+        format={(v) => capture_rate !== null ? `${v.toFixed(1)}%` : "N/A"}
+        sub="vs. perfect foresight oracle"
+        Icon={Target}
+        color="#fbbf24"
+        dimColor="rgba(251,191,36,0.12)"
+        glowClass="glow-amber"
+        trend={capture_rate ? "vs oracle" : undefined}
+      />
+    </motion.div>
   );
 }
