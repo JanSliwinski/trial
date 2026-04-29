@@ -70,7 +70,7 @@ export default function Hero() {
 
         <motion.p variants={fadeUp}
           className="text-[17px] text-text-2 leading-relaxed mb-10 max-w-2xl">
-          HelleniFlex gives battery operators a decisive competitive edge in the Greek Day-Ahead
+          Helios Grid gives battery operators a decisive competitive edge in the Greek Day-Ahead
           Market — generating optimal HEnEx bid strategies through stochastic water-value
           optimisation in under five seconds.
         </motion.p>
@@ -124,7 +124,7 @@ export default function Hero() {
         <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
           <div className="card">
             <div className="text-[11px] font-bold uppercase tracking-wider text-text-3 mb-4">
-              Why HelleniFlex
+              Why Helios Grid
             </div>
             <ul className="space-y-3">
               {FEATURES.map((f) => (

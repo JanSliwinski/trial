@@ -17,7 +17,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HelleniFlex — Battery Storage Optimizer",
+  title: "Helios Grid — Battery Storage Optimizer",
   description:
     "AI-powered stochastic water-value optimization for battery energy storage assets in the Greek Day-Ahead Market (HEnEx).",
   icons: {
