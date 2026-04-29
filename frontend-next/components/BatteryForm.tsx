@@ -118,21 +118,21 @@ export default function BatteryForm({ onSubmit, loading }: Props) {
         <div className="space-y-3">
           <Field label="Capacity (MWh)">
             <input
-              type="number" min={0.5} max={500} step={0.5}
+              type="number" min={0.5} max={500} step="any"
               value={specs.capacity_mwh}
               onChange={(e) => set("capacity_mwh", Number(e.target.value))}
             />
           </Field>
           <Field label="Max Power (MW)">
             <input
-              type="number" min={0.1} max={250} step={0.5}
+              type="number" min={0.1} max={250} step="any"
               value={specs.power_mw}
               onChange={(e) => set("power_mw", Number(e.target.value))}
             />
           </Field>
           <Field label="Round-trip Efficiency (%)">
             <input
-              type="number" min={51} max={99} step={0.5}
+              type="number" min={51} max={99} step="any"
               value={specs.rte_pct}
               onChange={(e) => set("rte_pct", Number(e.target.value))}
             />
@@ -157,14 +157,14 @@ export default function BatteryForm({ onSubmit, loading }: Props) {
 
           <Field label="Degradation Cost (€/MWh)">
             <input
-              type="number" min={0} max={50} step={0.5}
+              type="number" min={0} max={50} step="any"
               value={specs.deg_cost}
               onChange={(e) => set("deg_cost", Number(e.target.value))}
             />
           </Field>
           <Field label="Max Cycles / Day">
             <input
-              type="number" min={0.5} max={10} step={0.5}
+              type="number" min={0.5} max={10} step="any"
               value={specs.max_cycles}
               onChange={(e) => set("max_cycles", Number(e.target.value))}
             />

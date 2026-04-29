@@ -7,9 +7,10 @@ from pathlib import Path
 
 import numpy as np
 
-# frontend-next/api/ → frontend-next/  (where pipeline_v.py lives)
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from pipeline_v import optimize
+# Ensure api/ is on sys.path so _pipeline and _helleniflex are importable
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _pipeline import optimize  # noqa: E402
 
 
 def _serialize(obj):
@@ -30,7 +31,7 @@ class handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(200)
-        self._cors_headers()
+        self._cors()
         self.end_headers()
 
     def do_POST(self):
@@ -47,11 +48,11 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
-        self._cors_headers()
+        self._cors()
         self.end_headers()
         self.wfile.write(payload)
 
-    def _cors_headers(self) -> None:
+    def _cors(self) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
