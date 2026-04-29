@@ -423,7 +423,6 @@ export default function Home() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onHome={handleHome}
-        hasResult={!!result}
       />
 
       <div className="flex flex-1 overflow-hidden pt-[52px]">
@@ -523,6 +522,39 @@ export default function Home() {
                     className="text-[12px] text-primary hover:underline"
                   >
                     ← Try again
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {!loading && (activeTab === "analytics" || activeTab === "reports") && !result && (
+              <motion.div key={`empty-${activeTab}`}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="flex items-center justify-center h-full"
+              >
+                <div className="text-center max-w-sm">
+                  <div className="w-14 h-14 rounded-2xl border border-border bg-surface
+                                  flex items-center justify-center mx-auto mb-5">
+                    {activeTab === "analytics"
+                      ? <span className="text-2xl">📊</span>
+                      : <span className="text-2xl">📄</span>
+                    }
+                  </div>
+                  <p className="text-[14px] font-semibold text-text mb-2">
+                    {activeTab === "analytics" ? "Revenue Analytics" : "Optimisation Report"}
+                  </p>
+                  <p className="text-[12px] text-text-3 leading-relaxed mb-5">
+                    {activeTab === "analytics"
+                      ? "Run an optimisation to see per-interval P&L, hourly breakdown, and efficiency metrics."
+                      : "Run an optimisation to generate a full performance report with battery configuration and key findings."
+                    }
+                  </p>
+                  <button
+                    onClick={() => setActiveTab("dashboard")}
+                    className="text-[12px] text-primary hover:underline"
+                  >
+                    ← Go to Dashboard
                   </button>
                 </div>
               </motion.div>

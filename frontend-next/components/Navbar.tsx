@@ -10,7 +10,6 @@ interface Props {
   activeTab:   NavTab;
   onTabChange: (tab: NavTab) => void;
   onHome:      () => void;
-  hasResult:   boolean;
 }
 
 const NAV: { id: NavTab; label: string; Icon: React.ElementType }[] = [
@@ -27,7 +26,7 @@ const STATUS_MAP = {
 };
 
 export default function Navbar({
-  status, date, activeTab, onTabChange, onHome, hasResult,
+  status, date, activeTab, onTabChange, onHome,
 }: Props) {
   const s = STATUS_MAP[status];
 
@@ -56,23 +55,19 @@ export default function Navbar({
         </span>
       </button>
 
-      {/* Nav tabs — disabled until a result exists */}
+      {/* Nav tabs — always clickable */}
       <nav className="flex items-center gap-0.5">
         {NAV.map(({ id, label, Icon }) => {
-          const disabled = !hasResult && id !== "dashboard";
-          const active   = activeTab === id;
+          const active = activeTab === id;
           return (
             <button
               key={id}
-              disabled={disabled}
-              onClick={() => !disabled && onTabChange(id)}
+              onClick={() => onTabChange(id)}
               className={`flex items-center gap-1.5 px-3 py-[5px] rounded-lg text-[12px] font-medium
                           transition-all duration-150
                           ${active
                             ? "bg-primary/10 text-primary"
-                            : disabled
-                              ? "text-text-3 cursor-not-allowed opacity-40"
-                              : "text-text-2 hover:text-text hover:bg-surface-2"
+                            : "text-text-2 hover:text-text hover:bg-surface-2"
                           }`}
             >
               <Icon className="w-3.5 h-3.5" strokeWidth={1.8} />
